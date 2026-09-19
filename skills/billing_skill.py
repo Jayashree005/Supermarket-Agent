@@ -66,6 +66,46 @@ def build_or_update_bill(
     except (OversellError, GuardrailError, Exception) as e:
         return {"status": "error", "message": str(e)}
 
+def add_single_item_to_bill(
+    item_name: str,
+    quantity: float = 1.0,
+    unit: Optional[str] = None,
+    payment_mode: Optional[str] = None,
+    customer_name: Optional[str] = None,
+    bill_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Add an individual product to the active draft bill.
+    Example: add_single_item_to_bill("sugar", 2.0, "kg")
+    """
+    return build_or_update_bill(
+        items_to_add=[{"sku_or_name": item_name, "quantity": quantity, "unit": unit}],
+        payment_mode=payment_mode,
+        customer_name=customer_name,
+        bill_id=bill_id
+    )
+
+def remove_single_item_from_bill(item_name: str, bill_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Remove an item from the draft bill.
+    Example: remove_single_item_from_bill("butter")
+    """
+    return build_or_update_bill(
+        items_to_remove=[item_name],
+        bill_id=bill_id
+    )
+
+def update_single_item_quantity(item_name: str, new_quantity: float, bill_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Update the quantity of an item already on the draft bill.
+    Example: update_single_item_quantity("Maggi", 6.0)
+    """
+    return build_or_update_bill(
+        items_to_update=[{"sku_or_name": item_name, "quantity": new_quantity}],
+        bill_id=bill_id
+    )
+
+
 def view_draft_bill(bill_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Inspect the current active draft bill line items, taxes, and grand total.

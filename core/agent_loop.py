@@ -7,6 +7,7 @@ import os
 import re
 import time
 import json
+from collections import defaultdict
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 
@@ -27,6 +28,9 @@ from skills.inventory_skill import (
 )
 from skills.billing_skill import (
     build_or_update_bill,
+    add_single_item_to_bill,
+    remove_single_item_from_bill,
+    update_single_item_quantity,
     view_draft_bill,
     finalize_current_bill
 )
@@ -62,8 +66,8 @@ class KiranaOpsAgent:
             raise ValueError("GEMINI_API_KEY is not configured in environment or settings.")
         self.client = genai.Client(api_key=GEMINI_API_KEY)
         self.active_chats: Dict[str, Any] = {} # chat_id -> Chat instance
-        self.active_turn_artifacts: Dict[str, List[str]] = {}
-        self.active_turn_tools: Dict[str, List[str]] = {}
+        self.active_turn_artifacts: Dict[str, List[str]] = defaultdict(list)
+        self.active_turn_tools: Dict[str, List[str]] = defaultdict(list)
 
     def _build_system_prompt(self) -> str:
         """Constructs system instructions incorporating durable preferences from SQLite DB."""
@@ -73,14 +77,13 @@ class KiranaOpsAgent:
         shop_gstin = prefs.get("shop_gstin", "29ABCDE1234F1Z5")
         default_pay = prefs.get("default_payment_mode", "UPI")
 
-        # Format custom shortcuts/preferences
         pref_lines = []
         for k, v in prefs.items():
             pref_lines.append(f"• {k}: {v}")
         pref_str = "\n".join(pref_lines) if pref_lines else "None configured"
 
         return f"""You are the autonomous Supermarket Operations Agent running '{shop_name}'.
-The store owner interacts with you directly via Telegram in terse, real-world Indian shopkeeper language.
+The store owner interacts with you directly via Telegram or terminal in terse, real-world Indian shopkeeper language.
 
 STORE IDENTITY & LOCATION:
 • Store: {shop_name}
@@ -91,56 +94,68 @@ STORE IDENTITY & LOCATION:
 DURABLE PREFERENCES & STORE MEMORY:
 {pref_str}
 
-YOUR RESPONSIBILITIES:
-1. RECEIVING STOCK: Record inbound inventory deliveries, update cost price and MRP with receive_inward_stock.
-2. NEW PRODUCTS: Add newly stocked items to the catalog using add_new_product.
-3. BILLING / POS:
-   - Build bills incrementally over multi-turn conversations.
-   - When owner asks to make a bill or adds items, call build_or_update_bill.
-   - If owner says "drop X", "remove X", or "make it Y", call build_or_update_bill with modifications.
+YOUR RESPONSIBILITIES & TOOLS:
+1. INVENTORY & STOCK:
+   - "how much sugar is left?" -> call get_stock_status(item_name_or_sku="sugar").
+   - "what's running out?" -> call check_low_stock_alerts().
+   - "50 packets of Maggi came in, cost ₹12, MRP ₹14" -> call receive_inward_stock.
+   - "new item: ..." -> call add_new_product.
+
+2. BILLING & POS:
+   - "make a bill: 2kg sugar, 1 Aashirvaad atta 5kg, 4 Maggi, 1 Amul butter, UPI":
+     Call add_single_item_to_bill or build_or_update_bill for each item.
+   - "drop the butter" -> call remove_single_item_from_bill(item_name="butter") or build_or_update_bill.
+   - "make it 6 Maggi" -> call update_single_item_quantity(item_name="Maggi", new_quantity=6.0).
    - IMPORTANT: Stock is NOT decremented during drafting. It remains in draft until finalized.
-   - When owner asks to cut the bill, finalize, or settle, call finalize_current_bill.
-   - If payment mode is not mentioned, use the owner's standing default ({default_pay}) unless specified.
-4. OVERSELL GUARD:
-   - If stock is insufficient, finalize_current_bill will return an 'oversell_refused' status. Relate this refusal clearly to the owner. Stock CANNOT go negative.
-5. KHATA (CREDIT LEDGER):
-   - Check balances ("Ramesh's balance?"), record credit purchases ("put ₹500 on Ramesh's credit"), and record settlements ("Ramesh paid ₹300").
+   - "finalize the bill" / "cut the bill" / "charge Ramesh" -> call finalize_current_bill(payment_mode="...", customer_name="...").
+   - Always assume the owner's standing default payment mode ({default_pay}) unless another mode is stated.
+
+3. OVERSELL GUARD:
+   - If stock is insufficient, finalize_current_bill will return an 'oversell_refused' status. You must report this refusal clearly to the owner. Stock CANNOT go negative.
+
+4. KHATA (CREDIT LEDGER):
+   - "what's Ramesh's balance?" -> call check_customer_khata_balance(customer_name="Ramesh").
+   - "put ₹500 on Ramesh's credit" -> call add_credit_to_khata(customer_name="Ramesh", amount=500.0).
+   - "Ramesh paid ₹300" -> call record_khata_payment(customer_name="Ramesh", amount=300.0).
    - If a customer does not exist in Khata, settlement will be refused by the tool.
-6. DAILY CLOSE:
-   - Run end-of-day reconciliation ("today's sales?", "close the day") using get_daily_close.
-7. ARTIFACTS:
-   - "send me that bill as a PDF" -> call generate_gst_invoice_pdf.
-   - "make this week's sales analysis deck" -> call generate_business_analysis_deck.
-8. STANDING PREFERENCES:
-   - When owner sets a preference ("always assume UPI unless I say cash", "default atta = Aashirvaad 5kg"), call set_standing_preference.
 
-GROUNDING & AMBIGUITY RULES:
-• NEVER invent products, prices, or stock. Ground all information via tools.
-• AMBIGUITY: If the owner's request is ambiguous (e.g. "add atta" or "bill dal") and multiple products match in catalog (e.g. Aashirvaad Atta 5kg vs Loose Chakki Atta) without a standing preference, DO NOT GUESS. Call search_inventory to inspect options, and ask a concise clarifying question (e.g. "Which one — Aashirvaad 5kg or Loose Chakki Atta?").
-• If a standing preference exists (e.g. default atta = Aashirvaad 5kg), use the preferred SKU directly.
+5. DAILY CLOSE & ANALYTICS:
+   - "today's sales?" / "close the day" -> call get_daily_close().
 
-TONE & PHRASING:
-• Be prompt, crisp, and businesslike — speak like an efficient store manager / munshi.
-• Use ₹ (INR) for amounts.
-• Confirm actions clearly with item names, quantities, and totals.
+6. ARTIFACTS:
+   - "send me that bill as a PDF" -> call generate_gst_invoice_pdf().
+   - "make this week's sales analysis deck" -> call generate_business_analysis_deck().
+
+7. PREFERENCES:
+   - "always assume UPI unless I say cash" -> call set_standing_preference("default_payment_mode", "UPI").
+   - "default atta = Aashirvaad 5kg" -> call set_standing_preference("default_atta", "Aashirvaad Atta 5kg").
+
+AMBIGUITY RESOLUTION:
+• If an item request is ambiguous (e.g. "add atta") and multiple distinct products match (e.g. Aashirvaad Atta 5kg vs Loose Chakki Atta) without a standing preference, DO NOT GUESS. Ask a concise clarifying question (e.g. "Which atta: Aashirvaad Atta 5kg or Loose Chakki Atta?").
+• If a standing preference exists (e.g. default atta = Aashirvaad 5kg), bill that item directly.
+
+TONE & OUTPUT:
+• Keep responses terse, crisp, and businesslike like a real Indian kirana store manager.
+• Always use ₹ for amounts.
+• Confirm bill drafts with item count, line items, and net total.
 """
 
     def _wrap_tools(self, chat_id: str) -> List[Any]:
-        """Wraps domain skills into callable tools that record execution context and artifacts."""
+        """Wraps domain skills into callable tools with default arguments."""
         
-        def tool_search_inventory(query: str, category: Optional[str] = None):
+        def tool_search_inventory(query: str = "", category: Optional[str] = None):
             """Search products in store catalog by name, brand or category."""
             self.active_turn_tools[chat_id].append("search_inventory")
             return search_inventory(query, category)
 
-        def tool_get_stock_status(item_name_or_sku: str):
+        def tool_get_stock_status(item_name_or_sku: str = ""):
             """Check current stock quantity, price, and reorder status for an item."""
             self.active_turn_tools[chat_id].append("get_stock_status")
             return get_stock_status(item_name_or_sku)
 
         def tool_receive_inward_stock(
-            item_name_or_sku: str,
-            quantity: float,
+            item_name_or_sku: str = "",
+            quantity: float = 1.0,
             cost_price: Optional[float] = None,
             mrp: Optional[float] = None,
             sell_price: Optional[float] = None,
@@ -153,10 +168,10 @@ TONE & PHRASING:
             )
 
         def tool_add_new_product(
-            name: str,
-            unit: str,
-            cost_price: float,
-            mrp: float,
+            name: str = "",
+            unit: str = "packet",
+            cost_price: float = 0.0,
+            mrp: float = 0.0,
             sell_price: Optional[float] = None,
             gst_rate: float = 0.0,
             hsn_code: str = "9999",
@@ -178,6 +193,40 @@ TONE & PHRASING:
             self.active_turn_tools[chat_id].append("check_low_stock_alerts")
             return check_low_stock_alerts()
 
+        def tool_add_single_item_to_bill(
+            item_name: str = "",
+            quantity: float = 1.0,
+            unit: Optional[str] = None,
+            payment_mode: Optional[str] = None,
+            customer_name: Optional[str] = None
+        ):
+            """Add a single item to the active draft bill (e.g. item_name='sugar', quantity=2.0)."""
+            self.active_turn_tools[chat_id].append("add_single_item_to_bill")
+            active_id = SessionManager.get_active_bill_id(chat_id)
+            res = add_single_item_to_bill(
+                item_name=item_name,
+                quantity=quantity,
+                unit=unit,
+                payment_mode=payment_mode,
+                customer_name=customer_name,
+                bill_id=active_id
+            )
+            if res.get("status") == "draft_updated" and res.get("bill_id"):
+                SessionManager.set_active_bill_id(chat_id, res["bill_id"])
+            return res
+
+        def tool_remove_single_item_from_bill(item_name: str = ""):
+            """Remove an item from the active draft bill (e.g. item_name='butter')."""
+            self.active_turn_tools[chat_id].append("remove_single_item_from_bill")
+            active_id = SessionManager.get_active_bill_id(chat_id)
+            return remove_single_item_from_bill(item_name, bill_id=active_id)
+
+        def tool_update_single_item_quantity(item_name: str = "", new_quantity: float = 1.0):
+            """Update the quantity of an item on the active draft bill (e.g. item_name='Maggi', new_quantity=6.0)."""
+            self.active_turn_tools[chat_id].append("update_single_item_quantity")
+            active_id = SessionManager.get_active_bill_id(chat_id)
+            return update_single_item_quantity(item_name, new_quantity, bill_id=active_id)
+
         def tool_build_or_update_bill(
             items_to_add: Optional[List[Dict[str, Any]]] = None,
             items_to_remove: Optional[List[str]] = None,
@@ -185,7 +234,7 @@ TONE & PHRASING:
             payment_mode: Optional[str] = None,
             customer_name: Optional[str] = None
         ):
-            """Create or modify items on the active draft bill mid-build."""
+            """Create or modify multiple items on the active draft bill mid-build."""
             self.active_turn_tools[chat_id].append("build_or_update_bill")
             active_id = SessionManager.get_active_bill_id(chat_id)
             res = build_or_update_bill(
@@ -230,17 +279,17 @@ TONE & PHRASING:
                 SessionManager.clear_active_bill(chat_id)
             return res
 
-        def tool_check_customer_khata_balance(customer_name: str):
+        def tool_check_customer_khata_balance(customer_name: str = ""):
             """Check the outstanding credit balance of a customer in the khata ledger."""
             self.active_turn_tools[chat_id].append("check_customer_khata_balance")
             return check_customer_khata_balance(customer_name)
 
-        def tool_add_credit_to_khata(customer_name: str, amount: float, notes: Optional[str] = None):
+        def tool_add_credit_to_khata(customer_name: str = "", amount: float = 0.0, notes: Optional[str] = None):
             """Record a credit purchase on customer's khata ledger."""
             self.active_turn_tools[chat_id].append("add_credit_to_khata")
             return add_credit_to_khata(customer_name, amount, notes)
 
-        def tool_record_khata_payment(customer_name: str, amount: float, payment_mode: str = "cash", notes: Optional[str] = None):
+        def tool_record_khata_payment(customer_name: str = "", amount: float = 0.0, payment_mode: str = "cash", notes: Optional[str] = None):
             """Record customer settling/paying their credit. Refuses non-existent customers."""
             self.active_turn_tools[chat_id].append("record_khata_payment")
             return record_khata_payment(customer_name, amount, payment_mode, notes)
@@ -271,7 +320,7 @@ TONE & PHRASING:
                 self.active_turn_artifacts[chat_id].append(res["file_path"])
             return res
 
-        def tool_set_standing_preference(key: str, value: str):
+        def tool_set_standing_preference(key: str = "", value: str = ""):
             """Save a persistent store owner preference that endures across chats and restarts."""
             self.active_turn_tools[chat_id].append("set_standing_preference")
             return set_standing_preference(key, value)
@@ -287,6 +336,9 @@ TONE & PHRASING:
             tool_receive_inward_stock,
             tool_add_new_product,
             tool_check_low_stock_alerts,
+            tool_add_single_item_to_bill,
+            tool_remove_single_item_from_bill,
+            tool_update_single_item_quantity,
             tool_build_or_update_bill,
             tool_view_draft_bill,
             tool_finalize_current_bill,
@@ -304,7 +356,7 @@ TONE & PHRASING:
     def _get_or_create_chat(self, chat_id: str, model_name: Optional[str] = None):
         """Retrieves or creates an active Gemini Chat session for the chat_id."""
         target_model = model_name or GEMINI_MODEL
-        if chat_id not in self.active_chats or (model_name and self.active_chats[chat_id].model != target_model):
+        if chat_id not in self.active_chats or (model_name and getattr(self.active_chats[chat_id], "model", None) != target_model):
             tools = self._wrap_tools(chat_id)
             system_instruction = self._build_system_prompt()
             chat = self.client.chats.create(
@@ -344,19 +396,37 @@ TONE & PHRASING:
         for attempt in range(max_retries):
             try:
                 response = chat.send_message(message_text)
-                reply_text = response.text or "Done."
+                # Extract text from response safely
+                texts = []
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if getattr(part, "text", None):
+                            texts.append(part.text)
+                
+                reply_text = "\n".join(texts).strip()
+                if not reply_text:
+                    # If response.text is directly accessible
+                    reply_text = getattr(response, "text", "") or ""
+                
+                if not reply_text:
+                    # Provide fallback confirmation from active draft if tools were called
+                    active_id = SessionManager.get_active_bill_id(chat_id)
+                    if active_id:
+                        draft = StoreRepository.get_full_bill(active_id)
+                        item_names = [f"{i['quantity']} {i['unit']} {i['product_name']}" for i in draft["items"]]
+                        reply_text = f"Draft bill updated: {', '.join(item_names)} (Total: ₹{draft['rounded_total']:.2f}). Ready to finalize."
+                    else:
+                        reply_text = "Done."
                 break
             except Exception as e:
                 err_str = str(e)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                    # If on a heavy model, switch immediately to gemini-flash-lite-latest
                     if current_model != "gemini-flash-lite-latest":
                         current_model = "gemini-flash-lite-latest"
                         chat = self._get_or_create_chat(chat_id, current_model)
                         time.sleep(1.0)
                         continue
 
-                    # Extract wait seconds if present, e.g. "retry in 21s"
                     delay = 5.0 * (attempt + 1)
                     match = re.search(r"retry in (\d+(?:\.\d+)?)s", err_str)
                     if match:

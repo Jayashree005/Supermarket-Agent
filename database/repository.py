@@ -80,23 +80,40 @@ class StoreRepository:
 
     @staticmethod
     def get_product(sku_or_name: str) -> Optional[Dict[str, Any]]:
+        if not sku_or_name or not str(sku_or_name).strip():
+            return None
+        clean = str(sku_or_name).strip()
         conn = get_connection()
         cursor = conn.cursor()
-        # Direct SKU match
-        cursor.execute("SELECT * FROM products WHERE sku_id = ? COLLATE NOCASE;", (sku_or_name,))
+
+        # 1. Direct SKU match
+        cursor.execute("SELECT * FROM products WHERE sku_id = ? COLLATE NOCASE;", (clean,))
         row = cursor.fetchone()
         if row:
             return dict(row)
-        # Exact Name match
-        cursor.execute("SELECT * FROM products WHERE name = ? COLLATE NOCASE;", (sku_or_name,))
+
+        # 2. Exact Name match
+        cursor.execute("SELECT * FROM products WHERE name = ? COLLATE NOCASE;", (clean,))
         row = cursor.fetchone()
         if row:
             return dict(row)
-        # Partial match
-        cursor.execute("SELECT * FROM products WHERE name LIKE ? ORDER BY LENGTH(name) ASC LIMIT 1;", (f"%{sku_or_name}%",))
+
+        # 3. Substring match
+        cursor.execute("SELECT * FROM products WHERE name LIKE ? ORDER BY LENGTH(name) ASC LIMIT 1;", (f"%{clean}%",))
         row = cursor.fetchone()
         if row:
             return dict(row)
+
+        # 4. Token-based match (e.g. "atta 5kg" matches "Aashirvaad Atta 5kg")
+        tokens = [t for t in clean.split() if len(t) > 1 and t.lower() not in ["packet", "packets", "kg", "gm", "g"]]
+        if tokens:
+            like_clauses = " AND ".join(["name LIKE ?" for _ in tokens])
+            params = [f"%{t}%" for t in tokens]
+            cursor.execute(f"SELECT * FROM products WHERE {like_clauses} ORDER BY LENGTH(name) ASC LIMIT 1;", params)
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+
         return None
 
     @staticmethod
@@ -295,34 +312,55 @@ class StoreRepository:
             # Remove items
             if items_to_remove:
                 for target in items_to_remove:
-                    # Target can be sku_id or product name pattern
-                    conn.execute("""
-                        DELETE FROM bill_items 
-                        WHERE bill_id = ? AND (sku_id = ? OR product_name LIKE ?);
-                    """, (bill_id, target, f"%{target}%"))
+                    target_str = target.get("name") or target.get("sku_or_name") or target.get("item") or "" if isinstance(target, dict) else str(target).strip()
+                    if target_str:
+                        conn.execute("""
+                            DELETE FROM bill_items 
+                            WHERE bill_id = ? AND (sku_id = ? OR product_name LIKE ?);
+                        """, (bill_id, target_str, f"%{target_str}%"))
 
             # Update items
             if items_to_update:
                 for item in items_to_update:
-                    target = item.get("sku_or_name", "")
-                    new_qty = float(item.get("quantity", 1.0))
-                    conn.execute("""
-                        DELETE FROM bill_items 
-                        WHERE bill_id = ? AND (sku_id = ? OR product_name LIKE ?);
-                    """, (bill_id, target, f"%{target}%"))
-                    # Re-add with new quantity
-                    items_to_add = (items_to_add or []) + [{"sku_or_name": target, "quantity": new_qty, "unit": item.get("unit")}]
+                    if isinstance(item, dict):
+                        target = (
+                            item.get("sku_or_name") or item.get("name") or 
+                            item.get("item_name") or item.get("item") or item.get("product") or ""
+                        ).strip()
+                        new_qty = float(item.get("quantity") or item.get("qty") or 1.0)
+                        if target:
+                            conn.execute("""
+                                DELETE FROM bill_items 
+                                WHERE bill_id = ? AND (sku_id = ? OR product_name LIKE ?);
+                            """, (bill_id, target, f"%{target}%"))
+                            items_to_add = (items_to_add or []) + [{"sku_or_name": target, "quantity": new_qty, "unit": item.get("unit")}]
 
             # Add items
             if items_to_add:
                 for item in items_to_add:
-                    sku_or_name = item.get("sku_or_name", "")
-                    requested_qty = float(item.get("quantity", 1.0))
-                    requested_unit = item.get("unit")
+                    if isinstance(item, str):
+                        sku_or_name = item.strip()
+                        requested_qty = 1.0
+                        requested_unit = None
+                    elif isinstance(item, dict):
+                        sku_or_name = (
+                            item.get("sku_or_name") or item.get("name") or 
+                            item.get("item_name") or item.get("product_name") or 
+                            item.get("item") or item.get("product") or ""
+                        ).strip()
+                        requested_qty = float(item.get("quantity") or item.get("qty") or 1.0)
+                        requested_unit = item.get("unit")
+                    else:
+                        continue
 
                     product = StoreRepository.get_product(sku_or_name)
                     if not product:
-                        raise GuardrailError(f"Item '{sku_or_name}' was not found in store database.")
+                        # Try searching by tokens
+                        candidates = StoreRepository.search_products(sku_or_name)
+                        if candidates:
+                            product = candidates[0]
+                        else:
+                            raise GuardrailError(f"Item '{sku_or_name}' was not found in store database.")
 
                     normalized_qty = StoreRepository.normalize_unit(requested_qty, requested_unit, product["unit"])
                     
