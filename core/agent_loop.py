@@ -301,19 +301,21 @@ TONE & PHRASING:
             tool_get_standing_preferences
         ]
 
-    def _get_or_create_chat(self, chat_id: str):
+    def _get_or_create_chat(self, chat_id: str, model_name: Optional[str] = None):
         """Retrieves or creates an active Gemini Chat session for the chat_id."""
-        if chat_id not in self.active_chats:
+        target_model = model_name or GEMINI_MODEL
+        if chat_id not in self.active_chats or (model_name and self.active_chats[chat_id].model != target_model):
             tools = self._wrap_tools(chat_id)
             system_instruction = self._build_system_prompt()
             chat = self.client.chats.create(
-                model=GEMINI_MODEL,
+                model=target_model,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     tools=tools,
                     temperature=0.2
                 )
             )
+            chat.model = target_model
             self.active_chats[chat_id] = chat
         return self.active_chats[chat_id]
 
@@ -329,13 +331,14 @@ TONE & PHRASING:
 
     def process_message(self, chat_id: str, message_text: str, max_retries: int = 3) -> AgentTurnResult:
         """
-        Processes a shopkeeper turn with automatic rate-limit backoff handling.
+        Processes a shopkeeper turn with automatic model fallback & rate-limit backoff handling.
         Observe -> Reason -> Act -> Feed back -> Return answer & artifacts.
         """
         self.active_turn_artifacts[chat_id] = []
         self.active_turn_tools[chat_id] = []
 
-        chat = self._get_or_create_chat(chat_id)
+        current_model = GEMINI_MODEL
+        chat = self._get_or_create_chat(chat_id, current_model)
         
         reply_text = ""
         for attempt in range(max_retries):
@@ -346,11 +349,19 @@ TONE & PHRASING:
             except Exception as e:
                 err_str = str(e)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    # If on a heavy model, switch immediately to gemini-flash-lite-latest
+                    if current_model != "gemini-flash-lite-latest":
+                        current_model = "gemini-flash-lite-latest"
+                        chat = self._get_or_create_chat(chat_id, current_model)
+                        time.sleep(1.0)
+                        continue
+
                     # Extract wait seconds if present, e.g. "retry in 21s"
-                    delay = 15.0 * (attempt + 1)
+                    delay = 5.0 * (attempt + 1)
                     match = re.search(r"retry in (\d+(?:\.\d+)?)s", err_str)
                     if match:
-                        delay = float(match.group(1)) + 1.5
+                        delay = float(match.group(1)) + 1.0
+
                     if attempt < max_retries - 1:
                         time.sleep(delay)
                         continue

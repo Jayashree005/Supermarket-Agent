@@ -21,8 +21,8 @@ load_dotenv(BASE_DIR / ".env")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-# LLM Model Configuration
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# LLM Model Configuration (gemini-flash-lite-latest offers high RPM free-tier quota & fast function calling)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
 
 # Database Path
 DB_PATH = DATA_DIR / "kirana_store.db"
