@@ -100,8 +100,8 @@ def generate_weekly_analysis_deck(days: int = 7) -> str:
     conn = get_connection()
     cursor = conn.cursor()
 
-    shop_name = StoreRepository.get_preference("shop_name", "Sri Krishna Supermarket & Kirana")
-    shop_gstin = StoreRepository.get_preference("shop_gstin", "29ABCDE1234F1Z5")
+    shop_name = StoreRepository.get_preference("shop_name", "ABC Super Market")
+    shop_gstin = StoreRepository.get_preference("shop_gstin", "XXX")
 
     # Gather data
     start_date = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")

@@ -152,14 +152,16 @@ def generate_invoice_pdf(bill_data: Dict[str, Any]) -> str:
     story = []
 
     # Retrieve store preferences
-    shop_name = StoreRepository.get_preference("shop_name", "Sri Krishna Supermarket & Kirana")
-    shop_address = StoreRepository.get_preference("shop_address", "14, 100ft Road, Indiranagar, Bengaluru, Karnataka - 560038")
-    shop_gstin = StoreRepository.get_preference("shop_gstin", "29ABCDE1234F1Z5")
+    shop_name = StoreRepository.get_preference("shop_name", "ABC Super Market")
+    shop_address = StoreRepository.get_preference("shop_address", "ABC Super Market, Coimbatore, Tamil Nadu")
+    shop_gstin = StoreRepository.get_preference("shop_gstin", "XXX")
+    shop_state = StoreRepository.get_preference("shop_state", "Tamil Nadu")
+    shop_state_code = StoreRepository.get_preference("shop_state_code", "33")
 
     # Header
     story.append(Paragraph(shop_name.upper(), title_style))
     story.append(Paragraph(shop_address, subtitle_style))
-    story.append(Paragraph(f"<b>GSTIN:</b> {shop_gstin} | <b>State:</b> Karnataka (Code: 29)", subtitle_style))
+    story.append(Paragraph(f"<b>GSTIN:</b> {shop_gstin} | <b>State:</b> {shop_state} (Code: {shop_state_code})", subtitle_style))
     story.append(Spacer(1, 6))
     story.append(Paragraph("TAX INVOICE (RETAIL)", badge_style))
     story.append(Spacer(1, 8))
@@ -205,11 +207,11 @@ def generate_invoice_pdf(bill_data: Dict[str, Any]) -> str:
         Paragraph("<b>Item Description</b>", cell_bold),
         Paragraph("<b>HSN</b>", cell_bold),
         Paragraph("<b>Qty</b>", cell_bold),
-        Paragraph("<b>Rate (₹)</b>", cell_right_bold),
-        Paragraph("<b>Taxable (₹)</b>", cell_right_bold),
-        Paragraph("<b>CGST (₹)</b>", cell_right_bold),
-        Paragraph("<b>SGST (₹)</b>", cell_right_bold),
-        Paragraph("<b>Total (₹)</b>", cell_right_bold),
+        Paragraph("<b>Rate (Rs.)</b>", cell_right_bold),
+        Paragraph("<b>Taxable (Rs.)</b>", cell_right_bold),
+        Paragraph("<b>CGST (Rs.)</b>", cell_right_bold),
+        Paragraph("<b>SGST (Rs.)</b>", cell_right_bold),
+        Paragraph("<b>Total (Rs.)</b>", cell_right_bold),
     ]
 
     items_rows = [headers]
@@ -246,7 +248,7 @@ def generate_invoice_pdf(bill_data: Dict[str, Any]) -> str:
     
     # Left: Tax Slab Summary
     slab_rows = [
-        [Paragraph("<b>GST Slab</b>", cell_bold), Paragraph("<b>Taxable (₹)</b>", cell_right_bold), Paragraph("<b>CGST (₹)</b>", cell_right_bold), Paragraph("<b>SGST (₹)</b>", cell_right_bold), Paragraph("<b>Total Tax (₹)</b>", cell_right_bold)]
+        [Paragraph("<b>GST Slab</b>", cell_bold), Paragraph("<b>Taxable (Rs.)</b>", cell_right_bold), Paragraph("<b>CGST (Rs.)</b>", cell_right_bold), Paragraph("<b>SGST (Rs.)</b>", cell_right_bold), Paragraph("<b>Total Tax (Rs.)</b>", cell_right_bold)]
     ]
     for s in tax_summary.slab_breakup:
         slab_rows.append([
@@ -267,12 +269,12 @@ def generate_invoice_pdf(bill_data: Dict[str, Any]) -> str:
 
     # Right: Invoice Summary
     totals_data = [
-        [Paragraph("Taxable Subtotal:", cell_style), Paragraph(f"₹ {tax_summary.subtotal:.2f}", cell_right)],
-        [Paragraph("Total CGST:", cell_style), Paragraph(f"₹ {tax_summary.cgst_amount:.2f}", cell_right)],
-        [Paragraph("Total SGST:", cell_style), Paragraph(f"₹ {tax_summary.sgst_amount:.2f}", cell_right)],
-        [Paragraph("Total GST:", cell_bold), Paragraph(f"₹ {tax_summary.total_tax:.2f}", cell_right_bold)],
-        [Paragraph("Round Off:", cell_style), Paragraph(f"₹ {tax_summary.round_off:+.2f}", cell_right)],
-        [Paragraph("<b>Net Payable Amount:</b>", cell_bold), Paragraph(f"<b>₹ {tax_summary.rounded_total:,.2f}</b>", cell_right_bold)],
+        [Paragraph("Taxable Subtotal:", cell_style), Paragraph(f"Rs. {tax_summary.subtotal:.2f}", cell_right)],
+        [Paragraph("Total CGST:", cell_style), Paragraph(f"Rs. {tax_summary.cgst_amount:.2f}", cell_right)],
+        [Paragraph("Total SGST:", cell_style), Paragraph(f"Rs. {tax_summary.sgst_amount:.2f}", cell_right)],
+        [Paragraph("Total GST:", cell_bold), Paragraph(f"Rs. {tax_summary.total_tax:.2f}", cell_right_bold)],
+        [Paragraph("Round Off:", cell_style), Paragraph(f"Rs. {tax_summary.round_off:+.2f}", cell_right)],
+        [Paragraph("<b>Net Payable Amount:</b>", cell_bold), Paragraph(f"<b>Rs. {tax_summary.rounded_total:,.2f}</b>", cell_right_bold)],
     ]
     totals_table = Table(totals_data, colWidths=[120, 95])
     totals_table.setStyle(TableStyle([
