@@ -3,7 +3,7 @@
 > **Run an entire Indian kirana store from a chat window — with an agent, not a menu.**  
 > *Nebula KnowLab · Engineering Take-Home Assignment*
 
-Telegram Bot Handle: **`@KiranaOpsBot`** *(Configure your token in `.env` to deploy or test instantly via interactive CLI)*
+Telegram Bot: **Supermarket Ops Agent** (`@Supermarketagent_bot`) *(Configure your token in `.env` to deploy or test instantly via interactive CLI)*
 
 ---
 
@@ -15,7 +15,7 @@ Traditional bot architectures fall into two traps:
 2. **The LangGraph Node-per-Command State Machine Trap:** Imposing hardcoded graph transitions for every command misinterprets agentic autonomy. In real retail, conversations are fluid: an owner might check stock, add an item, ask about a customer balance, and modify a previous line item all within two turns.
 
 **Our Harness Architecture:**
-We authored an **Agent-First ReAct Control Loop** (`Observe → Reason → Act (Tool Call) → Feed Result Back → Continue`) powered natively by **Google Gemini (`gemini-2.5-flash` / `gemini-2.5-pro`)**. The model orchestrates modular domain skills, while **all financial invariants, tax mathematics, oversell guards, and data durability live strictly in the tool and database layer**.
+We authored an **Agent-First ReAct Control Loop** (`Observe → Reason → Act (Tool Call) → Feed Result Back → Continue`) powered natively by **Google Gemini (`gemini-3.6-flash` / `gemini-2.5-pro`)**. The model orchestrates modular domain skills, while **all financial invariants, tax mathematics, oversell guards, and data durability live strictly in the tool and database layer**.
 
 ```
                            +-------------------------------------+
@@ -125,7 +125,7 @@ Create a `.env` file in the root directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
 ### Step 3: Run the Verification Suite (All 9 Hard Parts)
