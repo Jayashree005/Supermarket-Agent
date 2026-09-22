@@ -32,8 +32,9 @@ def main():
 
     print("\n✓ Ready! The chat is the product. Speak in terse shopkeeper English.")
     print("Commands:")
-    print("  /new   - Reset conversation context (retains store memory & preferences)")
-    print("  /exit  - Quit interactive terminal")
+    print("  /new        - Reset conversation context & active draft (keeps stock & preferences)")
+    print("  /reset-db   - Wipe transactions & restore original stock, Khata & catalog")
+    print("  /exit       - Quit interactive terminal")
     print("-" * 75)
 
     while True:
@@ -49,6 +50,13 @@ def main():
             if user_input.lower() in ["/new", "/reset"]:
                 msg = agent.reset_chat(session_id)
                 print(f"\n🔄 {msg}")
+                continue
+
+            if user_input.lower() in ["/reset-db", "/reset-stock", "/reset-store"]:
+                from config.seed_data import reset_database
+                reset_database()
+                agent.reset_chat(session_id)
+                print("\n🔄 Store database reset! Stock quantities, Khata balances, and catalog restored to original state.")
                 continue
 
             print("\nThinking and executing tools...")

@@ -5,7 +5,9 @@ from database.db import get_db_cursor
 from config.settings import (
     DEFAULT_SHOP_NAME,
     DEFAULT_SHOP_ADDRESS,
-    DEFAULT_SHOP_GSTIN
+    DEFAULT_SHOP_GSTIN,
+    DEFAULT_STATE,
+    DEFAULT_STATE_CODE
 )
 
 INITIAL_PRODUCTS = [
@@ -231,6 +233,8 @@ INITIAL_PREFERENCES = {
     "shop_name": DEFAULT_SHOP_NAME,
     "shop_address": DEFAULT_SHOP_ADDRESS,
     "shop_gstin": DEFAULT_SHOP_GSTIN,
+    "shop_state": DEFAULT_STATE,
+    "shop_state_code": DEFAULT_STATE_CODE,
     "default_payment_mode": "UPI",
     "default_atta": "Aashirvaad Atta 5kg"
 }
@@ -276,3 +280,17 @@ def seed_database():
                 INSERT OR IGNORE INTO owner_preferences (key, value)
                 VALUES (?, ?)
             """, (k, str(v)))
+
+def reset_database():
+    """Wipes all transactional and catalog tables and re-seeds original products, stock, customers, and preferences."""
+    with get_db_cursor() as cursor:
+        cursor.execute("DELETE FROM bill_items;")
+        cursor.execute("DELETE FROM bills;")
+        cursor.execute("DELETE FROM stock_ledger;")
+        cursor.execute("DELETE FROM khata_ledger;")
+        cursor.execute("DELETE FROM khata_customers;")
+        cursor.execute("DELETE FROM chat_sessions;")
+        cursor.execute("DELETE FROM idempotency_log;")
+        cursor.execute("DELETE FROM products;")
+        cursor.execute("DELETE FROM owner_preferences;")
+    seed_database()
