@@ -2,7 +2,7 @@
 Unit tests for customer khata ledger and settlement guardrails.
 """
 import pytest
-from database.db import init_db
+from database.db import init_db, get_db_cursor
 from config.seed_data import seed_database
 from database.repository import StoreRepository, GuardrailError
 
@@ -10,6 +10,8 @@ from database.repository import StoreRepository, GuardrailError
 def setup_db():
     init_db()
     seed_database()
+    with get_db_cursor() as cursor:
+        cursor.execute("UPDATE khata_customers SET balance = 1200.0 WHERE name = 'Ramesh';")
 
 def test_khata_balance_query():
     cust = StoreRepository.get_khata_customer("Ramesh")

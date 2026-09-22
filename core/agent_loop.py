@@ -72,9 +72,11 @@ class KiranaOpsAgent:
     def _build_system_prompt(self) -> str:
         """Constructs system instructions incorporating durable preferences from SQLite DB."""
         prefs = StoreRepository.get_all_preferences()
-        shop_name = prefs.get("shop_name", "Sri Krishna Supermarket & Kirana")
-        shop_address = prefs.get("shop_address", "14, 100ft Road, Indiranagar, Bengaluru")
-        shop_gstin = prefs.get("shop_gstin", "29ABCDE1234F1Z5")
+        shop_name = prefs.get("shop_name", "ABC Super Market")
+        shop_address = prefs.get("shop_address", "ABC Super Market, Coimbatore, Tamil Nadu")
+        shop_gstin = prefs.get("shop_gstin", "XXX")
+        shop_state = prefs.get("shop_state", "Tamil Nadu")
+        shop_state_code = prefs.get("shop_state_code", "33")
         default_pay = prefs.get("default_payment_mode", "UPI")
 
         pref_lines = []
@@ -88,7 +90,7 @@ The store owner interacts with you directly via Telegram or terminal in terse, r
 STORE IDENTITY & LOCATION:
 • Store: {shop_name}
 • Location: {shop_address}
-• GSTIN: {shop_gstin} (Intra-state Karnataka, Code: 29)
+• GSTIN: {shop_gstin} (Intra-state {shop_state}, Code: {shop_state_code})
 • Default Payment Preference: {default_pay}
 
 DURABLE PREFERENCES & STORE MEMORY:

@@ -21,16 +21,16 @@ load_dotenv(BASE_DIR / ".env")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-# LLM Model Configuration (gemini-flash-lite-latest offers high RPM free-tier quota & fast function calling)
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
+# LLM Model Configuration (gemini-3.6-flash offers high RPM free-tier quota & fast function calling)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 # Database Path
 DB_PATH = DATA_DIR / "kirana_store.db"
 
 # Store Defaults (can be customized via persistent preferences)
-DEFAULT_SHOP_NAME = "Sri Krishna Supermarket & Kirana"
-DEFAULT_SHOP_ADDRESS = "14, 100ft Road, Indiranagar, Bengaluru, Karnataka - 560038"
-DEFAULT_SHOP_GSTIN = "29ABCDE1234F1Z5"
-DEFAULT_STATE = "Karnataka"
-DEFAULT_STATE_CODE = "29"
+DEFAULT_SHOP_NAME = "ABC Super Market"
+DEFAULT_SHOP_ADDRESS = "ABC Super Market, Coimbatore, Tamil Nadu"
+DEFAULT_SHOP_GSTIN = "XXX"
+DEFAULT_STATE = "Tamil Nadu"
+DEFAULT_STATE_CODE = "33"
 DEFAULT_CURRENCY = "₹"

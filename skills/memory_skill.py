@@ -10,8 +10,8 @@ def set_standing_preference(key: str, value: str) -> Dict[str, Any]:
     Examples:
     - default_payment_mode: 'UPI' or 'cash'
     - default_atta: 'Aashirvaad Atta 5kg'
-    - shop_name: 'Sri Krishna Supermarket & Kirana'
-    - shop_gstin: '29ABCDE1234F1Z5'
+    - shop_name: 'ABC Super Market'
+    - shop_gstin: 'XXX'
     """
     StoreRepository.set_preference(key, value)
     return {
