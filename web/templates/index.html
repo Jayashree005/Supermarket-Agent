@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supermarket Operations Management System</title>
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-icon">🏬</div>
+        <div>
+          <div class="brand-title">Supermarket Ops</div>
+          <div class="brand-badge">Automated Management</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-item active" data-view="dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Live Dashboard</span>
+        </div>
+        <div class="nav-item" data-view="inventory">
+          <i data-lucide="package"></i>
+          <span>Inventory & Stocks</span>
+        </div>
+        <div class="nav-item" data-view="billing">
+          <i data-lucide="receipt"></i>
+          <span>Point of Sale (POS)</span>
+        </div>
+        <div class="nav-item" data-view="khata">
+          <i data-lucide="book-open"></i>
+          <span>Customer Credit Ledger</span>
+        </div>
+        <div class="nav-item" data-view="artifacts">
+          <i data-lucide="file-text"></i>
+          <span>Invoices & PPTX Decks</span>
+        </div>
+        <div class="nav-item" data-view="preferences">
+          <i data-lucide="sliders"></i>
+          <span>Store Preferences</span>
+        </div>
+      </nav>
+
+      <div class="live-status-card">
+        <div class="pulse-dot"></div>
+        <div class="status-text">
+          Operations Online
+          <span id="connection-status">Live Telemetry Active</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <div class="main-wrapper">
+      <!-- Top Bar -->
+      <header class="top-header">
+        <div class="header-title-group">
+          <h2 id="view-title">Live Operations Dashboard</h2>
+          <p id="view-subtitle">Real-time inventory updates, live sales telemetry, and automated billing</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-outline" id="btn-quick-new-bill">
+            <i data-lucide="plus-circle" style="width:16px;height:16px"></i>
+            New Bill
+          </button>
+          <button class="btn btn-outline" id="btn-gen-pptx">
+            <i data-lucide="presentation" style="width:16px;height:16px"></i>
+            Generate Operations Deck
+          </button>
+          <button class="btn btn-outline" id="btn-reset-db" title="Restore seed catalog and balances">
+            <i data-lucide="rotate-ccw" style="width:16px;height:16px"></i>
+            Reset Database
+          </button>
+          <button class="btn btn-primary" id="toggle-chat-btn">
+            <i data-lucide="bot" style="width:16px;height:16px"></i>
+            Assistant Chat
+          </button>
+        </div>
+      </header>
+
+      <!-- Split Layout: Content + Docked Chatbot -->
+      <div class="workspace-container">
+        <!-- Views Viewport -->
+        <main class="views-viewport">
+          
+          <!-- VIEW 1: DASHBOARD -->
+          <section id="view-dashboard" class="view-section active">
+            <!-- 4 Quick Stats -->
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon emerald">₹</div>
+                <div class="stat-value" id="stat-today-sales">₹0.00</div>
+                <div class="stat-label">Today's Sales Revenue</div>
+                <div class="stat-subtext" id="stat-today-bills">0 bills generated today</div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon primary"><i data-lucide="box" style="width:20px;height:20px"></i></div>
+                <div class="stat-value" id="stat-total-products">0</div>
+                <div class="stat-label">Active SKUs in Catalog</div>
+                <div class="stat-subtext" id="stat-all-time-sales">Total All-Time: ₹0.00</div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon amber"><i data-lucide="alert-triangle" style="width:20px;height:20px"></i></div>
+                <div class="stat-value" id="stat-low-stock">0</div>
+                <div class="stat-label">Low Stock Alerts</div>
+                <div class="stat-subtext" id="stat-out-of-stock">0 items zero stock</div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon primary"><i data-lucide="book" style="width:20px;height:20px"></i></div>
+                <div class="stat-value" id="stat-khata-owed">₹0.00</div>
+                <div class="stat-label">Outstanding Customer Credit</div>
+                <div class="stat-subtext">Pending account settlements</div>
+              </div>
+            </div>
+
+            <!-- Dashboard 2-Columns -->
+            <div class="dashboard-columns">
+              <!-- Left Column: Recent Finalized Bills & Top Products -->
+              <div>
+                <div class="glass-panel">
+                  <div class="panel-header">
+                    <h3><i data-lucide="clock" style="width:18px;height:18px;color:#1e3a8a"></i> Recent Transactions</h3>
+                    <button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="switchView('billing')">View All</button>
+                  </div>
+                  <div class="data-table-container">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Bill Number</th>
+                          <th>Customer</th>
+                          <th>Payment Mode</th>
+                          <th>Taxable</th>
+                          <th>GST</th>
+                          <th>Grand Total</th>
+                          <th>Invoice</th>
+                        </tr>
+                      </thead>
+                      <tbody id="dashboard-recent-bills-tbody">
+                        <tr><td colspan="7" style="text-align:center;color:var(--text-dim)">Loading bills...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Top Items Today -->
+                <div class="glass-panel">
+                  <div class="panel-header">
+                    <h3><i data-lucide="trending-up" style="width:18px;height:18px;color:#059669"></i> Top Selling Items Today</h3>
+                  </div>
+                  <div class="data-table-container">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Product Name</th>
+                          <th>Quantity Sold</th>
+                          <th>Total Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody id="dashboard-top-items-tbody">
+                        <tr><td colspan="3" style="text-align:center;color:var(--text-dim)">No items sold yet today</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Real-Time Event Feed & Low Stock Watch -->
+              <div>
+                <div class="glass-panel">
+                  <div class="panel-header">
+                    <h3><i data-lucide="activity" style="width:18px;height:18px;color:#d97706"></i> Live Event Feed</h3>
+                    <span class="badge badge-in-stock">Real-time</span>
+                  </div>
+                  <div class="activity-feed" id="live-activity-feed">
+                    <div class="activity-item">
+                      <div class="activity-item-icon" style="background:#eff6ff;color:#1e3a8a">⚡</div>
+                      <div>
+                        <strong>System Active</strong>
+                        <div style="color:var(--text-muted);font-size:0.75rem">Live data stream monitoring stock changes, transactions, and assistant events...</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="glass-panel">
+                  <div class="panel-header">
+                    <h3><i data-lucide="shield-alert" style="width:18px;height:18px;color:#dc2626"></i> Low Stock Alerts</h3>
+                  </div>
+                  <div id="low-stock-list" style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font-size:0.8rem;color:var(--text-dim)">Checking stock levels...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 2: INVENTORY & STOCKS -->
+          <section id="view-inventory" class="view-section">
+            <div class="glass-panel">
+              <div class="panel-header">
+                <h3><i data-lucide="package" style="width:18px;height:18px;color:#1e3a8a"></i> Product Inventory & Catalog</h3>
+                <div style="display:flex;gap:8px">
+                  <input type="text" id="inventory-search" class="form-input" style="width:240px" placeholder="Search name, brand, SKU...">
+                  <button class="btn btn-primary" id="btn-open-inward-modal">+ Inward Stock</button>
+                  <button class="btn btn-outline" id="btn-open-new-sku-modal">+ New Product SKU</button>
+                </div>
+              </div>
+              <div class="data-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>SKU</th>
+                      <th>Product Name</th>
+                      <th>Category</th>
+                      <th>Stock Quantity</th>
+                      <th>Reorder Level</th>
+                      <th>Cost Price</th>
+                      <th>Sell Price (MRP)</th>
+                      <th>GST Slab</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventory-table-tbody">
+                    <tr><td colspan="10" style="text-align:center">Loading catalog...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 3: BILLING & POS -->
+          <section id="view-billing" class="view-section">
+            <!-- Active Draft Bill Panel -->
+            <div class="glass-panel" style="border: 1px solid var(--primary-border); background:#ffffff">
+              <div class="panel-header">
+                <div>
+                  <h3 style="color:#1e3a8a"><i data-lucide="shopping-cart" style="width:18px;height:18px"></i> Active Draft Bill (<span id="draft-bill-number">---</span>)</h3>
+                  <span style="font-size:0.75rem;color:var(--text-muted)">Changes made via conversation or manual controls reflect here automatically without locking stock until finalized</span>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button class="btn btn-outline" id="btn-clear-draft">Clear Draft</button>
+                  <button class="btn btn-success" id="btn-open-finalize-modal">
+                    <i data-lucide="check-circle" style="width:16px;height:16px"></i>
+                    Finalize Bill & Generate PDF
+                  </button>
+                </div>
+              </div>
+
+              <!-- Draft Line Items -->
+              <div class="data-table-container" style="margin-bottom:16px">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Item Description</th>
+                      <th>HSN</th>
+                      <th>Quantity</th>
+                      <th>Unit Price</th>
+                      <th>Taxable Value</th>
+                      <th>CGST</th>
+                      <th>SGST</th>
+                      <th>Total (₹)</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="draft-items-tbody">
+                    <tr><td colspan="10" style="text-align:center;color:var(--text-dim)">No items in active draft bill.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Draft Totals Bar -->
+              <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;padding:14px 18px;border-radius:var(--radius-md);border:1px solid var(--border-color)">
+                <!-- Quick Add Input -->
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input type="text" id="quick-add-item-name" class="form-input" style="width:200px" placeholder="Product name (e.g. Sugar)">
+                  <input type="number" id="quick-add-item-qty" class="form-input" style="width:80px" value="1" min="0.1" step="0.5">
+                  <button class="btn btn-primary" id="btn-quick-add-item">Add Item</button>
+                </div>
+                <!-- Totals -->
+                <div style="display:flex;gap:24px;text-align:right">
+                  <div>
+                    <div style="font-size:0.75rem;color:var(--text-muted)">Taxable Subtotal</div>
+                    <strong id="draft-taxable">₹0.00</strong>
+                  </div>
+                  <div>
+                    <div style="font-size:0.75rem;color:var(--text-muted)">Total GST</div>
+                    <strong id="draft-gst">₹0.00</strong>
+                  </div>
+                  <div>
+                    <div style="font-size:0.75rem;color:var(--text-muted)">Net Payable Amount</div>
+                    <span style="font-size:1.3rem;font-weight:700;color:#059669" id="draft-grand-total">₹0.00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- All Bills History -->
+            <div class="glass-panel">
+              <div class="panel-header">
+                <h3><i data-lucide="history" style="width:18px;height:18px"></i> Generated Invoices & Billing Archive</h3>
+                <input type="text" id="billing-history-search" class="form-input" style="width:220px" placeholder="Filter bill number...">
+              </div>
+              <div class="data-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Bill Number</th>
+                      <th>Date & Time</th>
+                      <th>Customer</th>
+                      <th>Payment Mode</th>
+                      <th>Taxable (₹)</th>
+                      <th>GST (₹)</th>
+                      <th>Total (₹)</th>
+                      <th>Status</th>
+                      <th>Invoice PDF</th>
+                    </tr>
+                  </thead>
+                  <tbody id="all-bills-tbody">
+                    <tr><td colspan="9" style="text-align:center">Loading history...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 4: CUSTOMER CREDIT LEDGER -->
+          <section id="view-khata" class="view-section">
+            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+              <div class="stat-card">
+                <div class="stat-icon primary"><i data-lucide="users"></i></div>
+                <div class="stat-value" id="khata-customer-count">0</div>
+                <div class="stat-label">Active Customer Accounts</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon amber">₹</div>
+                <div class="stat-value" id="khata-total-outstanding">₹0.00</div>
+                <div class="stat-label">Total Credit Outstanding</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon emerald"><i data-lucide="shield-check"></i></div>
+                <div class="stat-value">Protected</div>
+                <div class="stat-label">Financial Integrity Rules</div>
+                <div class="stat-subtext">Settlement for unknown accounts automatically refused</div>
+              </div>
+            </div>
+
+            <div class="dashboard-columns">
+              <!-- Customer Ledger Balances -->
+              <div class="glass-panel">
+                <div class="panel-header">
+                  <h3><i data-lucide="book-open" style="width:18px;height:18px;color:#1e3a8a"></i> Customer Credit Accounts</h3>
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-outline" id="btn-open-khata-credit-modal">+ Add Credit</button>
+                    <button class="btn btn-success" id="btn-open-khata-settle-modal">Record Payment</button>
+                  </div>
+                </div>
+                <div class="data-table-container">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Customer Name</th>
+                        <th>Phone</th>
+                        <th>Balance Due (₹)</th>
+                        <th>Last Updated</th>
+                        <th>Quick Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="khata-customers-tbody">
+                      <tr><td colspan="5" style="text-align:center">Loading accounts...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Recent Ledger Entries -->
+              <div class="glass-panel">
+                <div class="panel-header">
+                  <h3><i data-lucide="file-spreadsheet" style="width:18px;height:18px"></i> Credit Audit Trail</h3>
+                </div>
+                <div class="data-table-container">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Transaction Type</th>
+                        <th>Amount</th>
+                        <th>Balance After</th>
+                      </tr>
+                    </thead>
+                    <tbody id="khata-transactions-tbody">
+                      <tr><td colspan="5" style="text-align:center">Loading ledger entries...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 5: ARTIFACTS & PPTX -->
+          <section id="view-artifacts" class="view-section">
+            <div class="panel-header" style="margin-bottom:20px">
+              <div>
+                <h2>Generated Business Documents</h2>
+                <p style="color:var(--text-muted);font-size:0.85rem">Official GST Tax Invoices (PDF) and Operations Strategy Presentations (PPTX)</p>
+              </div>
+              <div style="display:flex;gap:10px">
+                <button class="btn btn-primary" id="btn-generate-deck-now">
+                  <i data-lucide="file-plus" style="width:16px;height:16px"></i>
+                  Generate Presentation Deck
+                </button>
+              </div>
+            </div>
+
+            <h3 style="font-size:1.05rem;margin-bottom:12px;color:#1e3a8a">PowerPoint Strategy Decks (.pptx)</h3>
+            <div class="artifacts-grid" id="artifacts-decks-grid" style="margin-bottom:30px">
+              <!-- Decks injected via JS -->
+            </div>
+
+            <h3 style="font-size:1.05rem;margin-bottom:12px;color:#059669">Tax Invoice Documents (.pdf)</h3>
+            <div class="artifacts-grid" id="artifacts-invoices-grid">
+              <!-- Invoices injected via JS -->
+            </div>
+          </section>
+
+          <!-- VIEW 6: PREFERENCES & MEMORY -->
+          <section id="view-preferences" class="view-section">
+            <div class="glass-panel" style="max-width:800px">
+              <div class="panel-header">
+                <div>
+                  <h3><i data-lucide="sliders" style="width:18px;height:18px;color:#1e3a8a"></i> Durable Store Preferences (Persistent Memory)</h3>
+                  <p style="font-size:0.8rem;color:var(--text-muted)">Stored outside model context window. Retained across chat restarts and system reboots.</p>
+                </div>
+                <button class="btn btn-primary" id="btn-save-preference">Save Preference</button>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+                <div class="form-group">
+                  <label>Preference Key</label>
+                  <input type="text" id="pref-key-input" class="form-input" placeholder="e.g. default_payment_mode or default_flour">
+                </div>
+                <div class="form-group">
+                  <label>Configured Value</label>
+                  <input type="text" id="pref-val-input" class="form-input" placeholder="e.g. UPI or Aashirvaad Atta 5kg">
+                </div>
+              </div>
+
+              <div class="data-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Key</th>
+                      <th>Configured Value</th>
+                    </tr>
+                  </thead>
+                  <tbody id="preferences-tbody">
+                    <tr><td colspan="2" style="text-align:center">Loading preferences...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <!-- Right Docked AI Chatbot Panel -->
+        <aside class="chat-drawer" id="chat-drawer">
+          <div class="chat-header">
+            <div class="chat-header-info">
+              <div class="bot-avatar">🤖</div>
+              <div>
+                <strong style="font-size:0.95rem">Store Operations Assistant</strong>
+                <div style="font-size:0.72rem;color:var(--emerald);display:flex;align-items:center;gap:4px">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--emerald);display:inline-block"></span>
+                  Ready to Assist
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" id="btn-reset-chat" style="padding:4px 8px;font-size:0.72rem" title="Clear chat & active draft">
+                New Session
+              </button>
+              <button class="btn btn-outline" id="btn-close-chat" style="padding:4px 8px;font-size:0.72rem" title="Minimize Assistant">
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- Chat Messages Area -->
+          <div class="chat-messages" id="chat-messages">
+            <div class="chat-msg agent">
+              <div class="chat-bubble">
+                Welcome! I am your automated Supermarket Operations Assistant. You can manage store workflows using plain language commands:
+                <br><br>
+                • <em>"How much sugar is left in stock?"</em><br>
+                • <em>"Create a bill: 2kg sugar, 1 Aashirvaad atta 5kg, 4 Maggi"</em><br>
+                • <em>"Finalize the bill via UPI"</em><br>
+                • <em>"What is Ramesh's credit balance?"</em><br>
+                • <em>"Generate this week's business presentation deck"</em>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Area -->
+          <div class="chat-input-area">
+            <!-- Quick Chips -->
+            <div class="quick-prompts">
+              <div class="prompt-chip" data-prompt="How much sugar is left in stock?">Check Sugar Stock</div>
+              <div class="prompt-chip" data-prompt="What products are running low on stock?">Low Stock Alerts</div>
+              <div class="prompt-chip" data-prompt="Make a bill: 2kg sugar, 1 Aashirvaad atta 5kg, 4 Maggi">Create Bill</div>
+              <div class="prompt-chip" data-prompt="Finalize the bill via UPI">Finalize Bill (UPI)</div>
+              <div class="prompt-chip" data-prompt="What is Ramesh's credit balance?">Ramesh Credit Balance</div>
+              <div class="prompt-chip" data-prompt="Generate this week's sales analysis deck">Create PPTX Deck</div>
+            </div>
+
+            <form class="chat-form" id="chat-form">
+              <input type="text" id="chat-input" class="chat-input" placeholder="Type a command (e.g. 2kg sugar, 4 maggi)..." autocomplete="off">
+              <button type="submit" class="btn btn-primary" id="chat-submit-btn">
+                <i data-lucide="send" style="width:16px;height:16px"></i>
+              </button>
+            </form>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 1: Inward Stock -->
+  <div class="modal-overlay" id="modal-inward">
+    <div class="modal-content">
+      <h3 style="margin-bottom:14px"><i data-lucide="download" style="width:18px;height:18px"></i> Receive Inward Stock</h3>
+      <form id="form-inward">
+        <div class="form-group">
+          <label>Product Name or SKU</label>
+          <input type="text" id="inward-product-name" class="form-input" required placeholder="e.g. Maggi 70g or SKU-MAGGI-70G">
+        </div>
+        <div class="form-group">
+          <label>Quantity Received</label>
+          <input type="number" id="inward-quantity" class="form-input" required min="0.1" step="0.5" value="10">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group">
+            <label>Cost Price (Optional)</label>
+            <input type="number" id="inward-cost" class="form-input" step="0.5" placeholder="Leave empty for current">
+          </div>
+          <div class="form-group">
+            <label>MRP / Sell Price (Optional)</label>
+            <input type="number" id="inward-mrp" class="form-input" step="0.5" placeholder="Leave empty for current">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Receive Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: New Product SKU -->
+  <div class="modal-overlay" id="modal-new-sku">
+    <div class="modal-content">
+      <h3 style="margin-bottom:14px"><i data-lucide="plus-square" style="width:18px;height:18px"></i> Add New Product SKU</h3>
+      <form id="form-new-sku">
+        <div class="form-group">
+          <label>Product Name</label>
+          <input type="text" id="sku-name" class="form-input" required placeholder="e.g. Tata Salt 1kg">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="sku-category" class="form-input" value="Groceries">
+          </div>
+          <div class="form-group">
+            <label>Unit (kg, packet, litre, piece)</label>
+            <input type="text" id="sku-unit" class="form-input" value="packet" required>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group">
+            <label>Cost Price (₹)</label>
+            <input type="number" id="sku-cost" class="form-input" required min="0" step="0.5" value="20">
+          </div>
+          <div class="form-group">
+            <label>MRP / Sell Price (₹)</label>
+            <input type="number" id="sku-mrp" class="form-input" required min="0" step="0.5" value="25">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group">
+            <label>GST Rate (e.g. 0.05 for 5%)</label>
+            <input type="number" id="sku-gst" class="form-input" min="0" max="0.28" step="0.01" value="0.05">
+          </div>
+          <div class="form-group">
+            <label>Initial Stock Quantity</label>
+            <input type="number" id="sku-stock" class="form-input" min="0" step="1" value="20">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create SKU</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Finalize Bill -->
+  <div class="modal-overlay" id="modal-finalize-bill">
+    <div class="modal-content">
+      <h3 style="margin-bottom:14px"><i data-lucide="check-circle" style="width:18px;height:18px"></i> Finalize Bill & Generate Invoice</h3>
+      <form id="form-finalize-bill">
+        <div class="form-group">
+          <label>Customer Name (Required if store credit)</label>
+          <input type="text" id="finalize-customer-name" class="form-input" placeholder="e.g. Walk-in Customer or Ramesh">
+        </div>
+        <div class="form-group">
+          <label>Payment Mode</label>
+          <select id="finalize-payment-mode" class="form-input">
+            <option value="cash">Cash</option>
+            <option value="upi" selected>UPI</option>
+            <option value="card">Card</option>
+            <option value="khata">Customer Credit Account</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Payment Reference / UTR (Optional)</label>
+          <input type="text" id="finalize-payment-ref" class="form-input" placeholder="e.g. UPI-928374281">
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="submit" class="btn btn-success">Finalize & Generate PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: Customer Credit Action -->
+  <div class="modal-overlay" id="modal-khata-action">
+    <div class="modal-content">
+      <h3 id="khata-modal-title" style="margin-bottom:14px">Customer Credit Action</h3>
+      <form id="form-khata-action">
+        <input type="hidden" id="khata-action-type" value="credit">
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" id="khata-customer-name" class="form-input" required placeholder="e.g. Ramesh">
+        </div>
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="khata-amount" class="form-input" required min="1" step="1" value="100">
+        </div>
+        <div class="form-group" id="khata-payment-mode-group" style="display:none">
+          <label>Payment Mode</label>
+          <select id="khata-payment-mode" class="form-input">
+            <option value="cash">Cash</option>
+            <option value="upi">UPI</option>
+            <option value="bank">Bank Transfer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes (Optional)</label>
+          <input type="text" id="khata-notes" class="form-input" placeholder="e.g. Weekly settlement payment">
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button type="button" class="btn btn-outline modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="khata-submit-btn">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Main JavaScript Application -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
